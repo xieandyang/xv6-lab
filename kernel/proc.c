@@ -120,6 +120,12 @@ found:
     return 0;
   }
 
+  // Clear VMAs
+  for(int i = 0;i < NVMA;i++)
+  {
+    p->vmas[i].valid = 0;
+  }
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -146,6 +152,11 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+  for(int i = 0;i < NVMA;i++)
+  {
+    struct vma* v = &p->vmas[i];
+    vmaunmap(p->pagetable, v->vastart, v->sz, v);
+  }
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
@@ -289,6 +300,16 @@ fork(void)
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
+
+  for(i = 0;i < NVMA;i++)
+  {
+    struct vma* v = &p->vmas[i];
+    if(v->valid)
+    {
+      np->vmas[i] = *v;
+      filedup(v->f);
+    }
+  }
 
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
